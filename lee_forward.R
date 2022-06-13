@@ -1,6 +1,7 @@
 #===========================================================================
-# saber_forward.R simulates the remote sensing reflectance given the wavelengths,
-# the water components along with bathymetry and bottom reflectance (for shallow water)
+# Lee_forward.R simulates the remote sensing reflectance given the wavelengths,
+# the water components along with bathymetry and bottom reflectance (for shallow water) 
+# following  Lee et al. (1998), with the corrections of Lee et al. (1999).
 
 #Author: Mr. Soham Mukherjee - PhD Student, Aquatel, UQAR
 #===========================================================================
@@ -38,8 +39,9 @@ snell_law <- function(view,sun){#Function to convert above water to under water 
   return(data.frame("view_w"=view_w, "sun_w"=sun_w, "rho_L"=rho_L))
 }
 
-Saber_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0.00726002,z=2, 
-                           rb.fraction=fA.set, plot=FALSE, verbose=FALSE,realdata){
+Lee_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0.00726002,z=2, 
+                           rb.fraction=fA.set, plot=FALSE, verbose=FALSE,
+                           realdata){
   ## OAC and IOP initialization
   
   # Read input params for forward modeling
@@ -270,10 +272,6 @@ Saber_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0
   ext <-  abs+bb# [1/m] extinction coeff.
   omega_b <-  bb/ext# single back scattering albedo
   
-  if (verbose == TRUE) {
-    print(paste0("omega albedo calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
-  }
-  
   ################################################################################################
   ##                                      RT Model                                              ##
   ################################################################################################
@@ -285,26 +283,24 @@ Saber_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0
   sun_w <- geometry$sun_w; view_w <- geometry$view_w; rho_L <- geometry$rho_L
   
   if (verbose == TRUE) {
-    print("Viewing Geometry and Fresnel reflectance below surface calculated")
+    print("Viewing Geometry and Fresnel reflectance at surface calculated")
   }
   
-  ## Remote Sensing Reflectance below the water surface
+  p1  <- 0.084
+  p2  <- 0.17
+  k1w <- 1.03
+  k2w <- 2.04
+  k1b <- 1.04
+  k2b <- 5.04 
+  q1=1 #(for viewing angle=0)
+  k <- abs + bb
+  u <- bb / k
   
-  if(type_case_water == "1"){
-    #case 1
-    
-    f_rs <- 0.095 # [1/sr] 
-  } else {
-    if (type_case_water == "2") {
-      #case 2
-      
-      f_rs <- 0.0512*(1 + (4.6659*omega_b) +(-7.8387*(omega_b^2)) + (5.4571*(omega_b^3)) )*(1+(0.1098/cos(sun_w)))*(1+(0.4021/cos(view_w)))# [1/sr]
-    }
+  if (verbose == TRUE) {
+    print(paste0("omega albedo calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
   }
   
-  
-  Rrs_below_deep <- f_rs*omega_b# [1/sr]
-  
+  Rrs_below_deep <- q1 * (p1 + p2 * u) * u
   if (type_Rrs_below == "deep") {
     
     Rrs_below <- Rrs_below_deep
@@ -313,8 +309,7 @@ Saber_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0
       print(paste0("Subsurface (0^-)Rrs for deep water calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
     }
     
-  } else{
-    
+  } else {
     if (type_Rrs_below == "shallow") {
       #Bottom Contribution
       
@@ -387,161 +382,145 @@ Saber_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0
         print(paste0("Aerial fraction scaled bottom albedo generated from ", min(lambda), " nm to ", max(lambda), " nm."))
       }
       
-      # Attenuation Coefficients
-      if (type_case_water == 1) {
-        
-        k0 <- 1.0395 #case 1
-      } else {
-        if (type_case_water == 2) {
-          
-          k0 <- 1.0546 #case 2
-        }
-      }
+      mu_s <- cos(sun_w)
+      mu_v <- cos(view_w)
+      du_w <- k1w * sqrt(1 + k2w * u)
+      du_b <- k1b * sqrt(1 + k2b * u)
+      Rrs_below_shallow    <- Rrs_below_deep * (1 - exp(-(1 / mu_s + du_w / mu_v) * k * zB)) + 
+        Rrs_Bottom * exp(-(1 / mu_s + du_b / mu_v) * k * zB)
       
-      Kd <- k0*(ext/cos(sun_w))
-      kuW <- (ext/cos(view_w))*((1+omega_b)^3.5421)*(1-(0.2786/cos(sun_w)))
-      kuB <- (ext/cos(view_w))*((1+omega_b)^2.2658)*(1-(0.0577/cos(sun_w)))
-      
-      if (verbose == TRUE) {
-        print(paste0("Attenuation coefficients calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
-      }
-      
-      
-      #Final calculation for shallow Rrs
-      Ars1 <- 1.1576; Ars2 <- 1.0389 #Paramteric coeffs for shallow water
-      Rrs_below_shallow <-  Rrs_below_deep*(1-(Ars1*exp(-zB*(Kd+kuW)))) + Ars2*Rrs_Bottom*exp(-zB*(Kd+kuB)) 
       Rrs_below <- Rrs_below_shallow
-      
       if (verbose == TRUE) {
         print(paste0("Subsurface (0^-) Rrs in Shallow water calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
       }
     }
   }
-  
-  #--------------------------------------------------------------------------
-  ## Remote sensing reflectance above the surface
-  #--------------------------------------------------------------------------
-  # Extraterrestrial solar irradiance [mW/m^2 nm]
-  E0 <-  read.table("./input-spectra/E0.txt", header = F)
-  E0.wavelength <-  E0$V1
-  E0.ett <-  E0$V2
-  E0 <- rep(length(lambda), 0)
-  
-  E0 <-  Hmisc::approxExtrap(x =E0.wavelength, y =E0.ett, xout = lambda, method = "linear")$y
-  
-  # Oxygen absorption [1/cm]
-  absO2 <- read.table("./input-spectra/absO2.A", header = F)
-  absO2.wavelength <-  absO2$V1
-  absO2.oxy <-  absO2$V2
-  abs_O2 <- rep(length(lambda), 0)
-  
-  abs_O2 <-  Hmisc::approxExtrap(x =absO2.wavelength, y =absO2.oxy, xout = lambda, method = "linear")$y
-  
-  # Ozone absorption [1/cm]
-  absO3 <- read.table("./input-spectra/absO3.A", header = F)
-  absO3.wavelength <-  absO3$V1
-  absO3.oxy <-  absO3$V2
-  abs_O3 <- rep(length(lambda), 0)
-  
-  abs_O3 <-  Hmisc::approxExtrap(x =absO3.wavelength, y =absO3.oxy, xout = lambda, method = "linear")$y
-  
-  # Water vapour absorption [1/cm]
-  absWV <- read.table("./input-spectra/absWV.A", header = F)
-  absWV.wavelength <-  absWV$V1
-  absWV.wv <-  absWV$V2
-  abs_WV <- rep(length(lambda), 0)
-  
-  abs_WV <-  Hmisc::approxExtrap(x =absWV.wavelength, y =absWV.wv, xout = lambda, method = "linear")$y
-  
-  # angles from deg to rad
-  
-  view_rad=view*(180/pi); # rad
-  sun_rad=sun*(180/pi);   # rad
-  
-  # Downwelling Irradiance [mW/m^2 nm]
-  M <- 1/(cos(sun_rad)+(0.50572*((90+ 6.079975-sun)^(-1.253))))
-  M1 <-  (M*P)/1013.25
-  Moz <-  1.0035/ (((cos(sun_rad)^2)+0.007)^0.5)
-  
-  
-  # Air mass type
-  if (type_case_water == "1") { 
-    AM <- 1
-  } else{
     
-    AM <- 1
-  }
-  
-  omega_a <- ((-0.0032*AM) + 0.972)*exp(RH*3.06*(10^-4))
-  
-  Ha <- 1; V <- 15# [km] aerosol scale height and horizontal visibility
-  beta <- 3.91*(Ha/V)
-  tau_a <-  beta*((lambda/550)^(-alpha))
-  
-  Tr <-   exp(-M1/((115.6406*(lambda^(4)))-(1.335*(lambda^(2)))))
-  Taa <-  exp(-(1-omega_a)*tau_a*M)
-  Tas <-  exp(-omega_a*tau_a*M)
-  Toz <-  exp(-abs_O3*Hoz*Moz)
-  To <-   exp((-1.41*abs_O2*M1)/((1+(118.3*abs_O2*M1))^0.45))
-  Twv <-  exp((-0.2385*abs_WV*WV*M)/((1+(20.07*abs_WV*WV*M))^0.45))
-  
-  
-  B3 <- 0.82 - (0.1417*alpha); B1 <-  B3*(1.459 +(B3*(0.1595+(0.4129*B3)))); B2 <-  B3*(0.0783 +(B3*(-0.3824-(0.5874*B3))))
-  Fa <-  1-(0.5*exp((B1+(B2*cos(sun_rad)))*cos(sun_rad)))
-  
-  Edd <-  E0*Tr*Taa*Tas*Toz*To*Twv*cos(sun_rad)
-  Edsr <- (1/2)*E0*(1-(Tr^(0.95)))*Taa*Tas*Toz*To*Twv*cos(sun_rad)
-  Edsa <-  E0*(Tr^(1/2))*Taa*(1-Tas)*Toz*To*Twv*cos(sun_rad)*Fa
-  Eds <-  Edsr+Edsa# diffuse downwelling irradiance (sum of Rayleigh and aerosol)
-  
-  Ed <-  (f_dd*Edd) + (f_ds*Eds)# downwelling irradiance
-  
-  # Sky Radiance
-  Ls <-  (g_dd*Edd) + (g_dsr*Edsr) + (g_dsa*Edsa)# [mW/sr m^2 nm]
-  
-  # Remote sensing reflectance above the surface [1/sr]
-  Rrs_above <-  rho_L*(Ls/Ed)
-  
-  if (verbose == TRUE) {
-    print(paste0("Skyglint calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
-  }
-  #--------------------------------------------------------------------------
-  ## Final Remote sensing reflectance computation
-  #--------------------------------------------------------------------------
-  sigma <- 0.03; nW <- 1.33; rho_U <- 0.54; Q <- 5#[sr]
-  
-  if (type_Rrs_water == "below_surface") {
+    #--------------------------------------------------------------------------
+    ## Remote sensing reflectance above the surface
+    #--------------------------------------------------------------------------
+    # Extraterrestrial solar irradiance [mW/m^2 nm]
+    E0 <-  read.table("./input-spectra/E0.txt", header = F)
+    E0.wavelength <-  E0$V1
+    E0.ett <-  E0$V2
+    E0 <- rep(length(lambda), 0)
     
-    Rrs <-  Rrs_below
+    E0 <-  Hmisc::approxExtrap(x =E0.wavelength, y =E0.ett, xout = lambda, method = "linear")$y
     
-    if (verbose == TRUE) {
-      print(paste0("Subsurface (0^-)Rrs calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
+    # Oxygen absorption [1/cm]
+    absO2 <- read.table("./input-spectra/absO2.A", header = F)
+    absO2.wavelength <-  absO2$V1
+    absO2.oxy <-  absO2$V2
+    abs_O2 <- rep(length(lambda), 0)
+    
+    abs_O2 <-  Hmisc::approxExtrap(x =absO2.wavelength, y =absO2.oxy, xout = lambda, method = "linear")$y
+    
+    # Ozone absorption [1/cm]
+    absO3 <- read.table("./input-spectra/absO3.A", header = F)
+    absO3.wavelength <-  absO3$V1
+    absO3.oxy <-  absO3$V2
+    abs_O3 <- rep(length(lambda), 0)
+    
+    abs_O3 <-  Hmisc::approxExtrap(x =absO3.wavelength, y =absO3.oxy, xout = lambda, method = "linear")$y
+    
+    # Water vapour absorption [1/cm]
+    absWV <- read.table("./input-spectra/absWV.A", header = F)
+    absWV.wavelength <-  absWV$V1
+    absWV.wv <-  absWV$V2
+    abs_WV <- rep(length(lambda), 0)
+    
+    abs_WV <-  Hmisc::approxExtrap(x =absWV.wavelength, y =absWV.wv, xout = lambda, method = "linear")$y
+    
+    # angles from deg to rad
+    
+    view_rad=view*(180/pi); # rad
+    sun_rad=sun*(180/pi);   # rad
+    
+    # Downwelling Irradiance [mW/m^2 nm]
+    M <- 1/(cos(sun_rad)+(0.50572*((90+ 6.079975-sun)^(-1.253))))
+    M1 <-  (M*P)/1013.25
+    Moz <-  1.0035/ (((cos(sun_rad)^2)+0.007)^0.5)
+    
+    
+    # Air mass type
+    if (type_case_water == "1") { 
+      AM <- 1
+    } else{
+      
+      AM <- 1
     }
     
-  } else {
-    if (type_Rrs_water == "above_surface_with_glint") {
+    omega_a <- ((-0.0032*AM) + 0.972)*exp(RH*3.06*(10^-4))
+    
+    Ha <- 1; V <- 15# [km] aerosol scale height and horizontal visibility
+    beta <- 3.91*(Ha/V)
+    tau_a <-  beta*((lambda/550)^(-alpha))
+    
+    Tr <-   exp(-M1/((115.6406*(lambda^(4)))-(1.335*(lambda^(2)))))
+    Taa <-  exp(-(1-omega_a)*tau_a*M)
+    Tas <-  exp(-omega_a*tau_a*M)
+    Toz <-  exp(-abs_O3*Hoz*Moz)
+    To <-   exp((-1.41*abs_O2*M1)/((1+(118.3*abs_O2*M1))^0.45))
+    Twv <-  exp((-0.2385*abs_WV*WV*M)/((1+(20.07*abs_WV*WV*M))^0.45))
+    
+    
+    B3 <- 0.82 - (0.1417*alpha); B1 <-  B3*(1.459 +(B3*(0.1595+(0.4129*B3)))); B2 <-  B3*(0.0783 +(B3*(-0.3824-(0.5874*B3))))
+    Fa <-  1-(0.5*exp((B1+(B2*cos(sun_rad)))*cos(sun_rad)))
+    
+    Edd <-  E0*Tr*Taa*Tas*Toz*To*Twv*cos(sun_rad)
+    Edsr <- (1/2)*E0*(1-(Tr^(0.95)))*Taa*Tas*Toz*To*Twv*cos(sun_rad)
+    Edsa <-  E0*(Tr^(1/2))*Taa*(1-Tas)*Toz*To*Twv*cos(sun_rad)*Fa
+    Eds <-  Edsr+Edsa# diffuse downwelling irradiance (sum of Rayleigh and aerosol)
+    
+    Ed <-  (f_dd*Edd) + (f_ds*Eds)# downwelling irradiance
+    
+    # Sky Radiance
+    Ls <-  (g_dd*Edd) + (g_dsr*Edsr) + (g_dsa*Edsa)# [mW/sr m^2 nm]
+    
+    # Remote sensing reflectance above the surface [1/sr]
+    Rrs_above <-  rho_L*(Ls/Ed)
+    
+    if (verbose == TRUE) {
+      print(paste0("Skyglint calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
+    }
+    #--------------------------------------------------------------------------
+    ## Final Remote sensing reflectance computation
+    #--------------------------------------------------------------------------
+    sigma <- 0.03; nW <- 1.33; rho_U <- 0.54; Q <- 5#[sr]
+    
+    if (type_Rrs_water == "below_surface") {
       
-      Rrs <-  (((1-sigma)*(1-rho_L)/(nW^2))* (Rrs_below/(1-rho_U*Q*Rrs_below)))+ Rrs_above
+      Rrs <-  Rrs_below
       
       if (verbose == TRUE) {
-        print(paste0("Above surface (0^+)Rrs with modelled glint calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
+        print(paste0("Subsurface (0^-)Rrs calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
       }
       
     } else {
-      if (type_Rrs_water == "above_surface_only") {
+      if (type_Rrs_water == "above_surface_with_glint") {
         
-        Rrs <-  (((1-sigma)*(1-rho_L)/(nW^2))* (Rrs_below/(1-rho_U*Q*Rrs_below)))
+        Rrs <-  (((1-sigma)*(1-rho_L)/(nW^2))* (Rrs_below/(1-rho_U*Q*Rrs_below)))+ Rrs_above
         
         if (verbose == TRUE) {
-          print(paste0("Above surface (0^+)Rrs calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
+          print(paste0("Above surface (0^+)Rrs with modelled glint calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
+        }
         
+      } else {
+        if (type_Rrs_water == "above_surface_only") {
+          
+          Rrs <-  (((1-sigma)*(1-rho_L)/(nW^2))* (Rrs_below/(1-rho_U*Q*Rrs_below)))
+          
+          if (verbose == TRUE) {
+            print(paste0("Above surface (0^+)Rrs calculated from ", min(lambda), " nm to ", max(lambda), " nm."))
+            
+          }
+        }
       }
     }
-    }
-  }
-  
+    
+    
+  ## Remote Sensing Reflectance below the water surface
   #Compare actual vs modelled Rrs
-  #Rrs_obs.interp <- Hmisc::approxExtrap(Rrs_obs_wl, Rrs_obs, xout = lambda, method = "linear")$y
   
   plotframe.rrs <- data.frame("wave"=lambda, "rrs.est"=Rrs, "rrs.obs"=Rrs_obs.interp)
   xmin = min(plotframe.rrs$wave); xmax= max(plotframe.rrs$wave); xstp=100
@@ -603,3 +582,4 @@ Saber_forward <-  function(chl=4.96, acdom440=0.9322314, anap440=0.07, bbp.550=0
                          "p.bias"=Res.spectral),"ss.residual"=Res,"method"=c("SSR eucledian")))
   #return(Res)
 }
+

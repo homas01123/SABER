@@ -8,7 +8,7 @@
 
 
 Saber_inverse <-  function(param, valdata, bbp.550=0.00726002,
-                           z=2, rb.fraction=fA.set, cost.function="eucleid.ss", verbose=TRUE){
+                           z=2, rb.fraction=fA.set, cost.function="eucleid.ss", verbose=FALSE){
   ## OAC and IOP initialization
   
   # Read input params for forward modeling
@@ -154,7 +154,7 @@ Saber_inverse <-  function(param, valdata, bbp.550=0.00726002,
   
   for (i in 1:length(lambda)){
     
-    print(lambda[i])
+    #print(lambda[i])
     bb_x[i] = base.bbp*((lambda[i]/550)^-(refexponent)) #Implement power model
     
   }
@@ -471,54 +471,6 @@ Saber_inverse <-  function(param, valdata, bbp.550=0.00726002,
   # #Compare actual vs modelled Rrs
   # #Rrs_obs.interp <- Hmisc::approxExtrap(Rrs_obs_wl, Rrs_obs, xout = lambda, method = "linear")$y
    Rrs_obs.interp <- valdata
-  # #Create Plot
-  # plotframe.rrs <- data.frame("wave"=lambda, "rrs.est"=Rrs, "rrs.obs"=Rrs_obs.interp)
-  # xmin = min(plotframe.rrs$wave); xmax= max(plotframe.rrs$wave); xstp=100
-  # ymin= 0; ymax=max(plotframe.rrs$rrs.obs);ystp= signif(ymax/5, digits = 1)
-  # asp_rat <- (xmax-xmin)/(ymax-ymin)
-  # 
-  # g1 <- ggplot()  + geom_line(data = plotframe.rrs,aes(y=rrs.est,color="xx1",x = wave),
-  #                             size=1.3,show.legend = TRUE) +
-  #   geom_line(data = plotframe.rrs,aes(y=rrs.obs,x = wave,color="xx5"),linetype="dashed", 
-  #             size=1.3,show.legend = TRUE)+
-  #   scale_colour_manual(labels = c(expression(paste(italic("R")["rs,model"])),
-  #                                  expression(paste(italic("R")["rs,actual"]))), 
-  #                       values = c("blue","green")) +
-  #   #ggtitle(paste0(stationlist[i])) +
-  #   scale_x_continuous(name = expression(paste("Wavelength(", lambda, ")[nm]")), limits = c(xmin, xmax), 
-  #                      breaks = seq(xmin, xmax, xstp))  +
-  #   scale_y_continuous(name =expression(paste(italic("R"),{}[rs],"(",lambda,",", 0^"-",")[", sr^-1,"]")) , limits = c(ymin, ymax),
-  #                      breaks = seq(ymin, ymax, ystp))+ 
-  #   coord_fixed(ratio = asp_rat, xlim = c(xmin, xmax), 
-  #               ylim = c(ymin, ymax), expand = FALSE, clip = "on") +
-  #   theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
-  #         axis.text.x = element_text(size = 20, color = 'black', angle = 0), 
-  #         axis.text.y = element_text(size = 20, color = 'black', angle = 0), 
-  #         axis.title.x = element_text(size = 25),
-  #         axis.title.y = element_text(size = 25),
-  #         axis.ticks.length = unit(.25, "cm"),
-  #         legend.position=c(0.70, 0.9),
-  #         legend.direction = "vertical",
-  #         legend.title = element_blank(),
-  #         legend.text = element_text(colour = "black", size = 20, face = "plain"),
-  #         legend.background = element_rect(fill = NA, size = 0.5, 
-  #                                          linetype = "solid", colour = 0),
-  #         legend.key = element_blank(),
-  #         legend.justification = c("left", "top"),
-  #         panel.background = element_blank(),
-  #         panel.grid.major = element_line(colour = "grey", 
-  #                                         size = 0.5, linetype = "dotted"), 
-  #         panel.grid.minor = element_blank(),
-  #         #legend.spacing.y = unit(2.0, 'cm'),
-  #         plot.margin = unit(c(0.5,0.5,0.0,0.0), "cm"),
-  #         legend.text.align = 0,
-  #         panel.border = element_rect(colour = "black", fill = NA, size = 1.5))
-  # g1 
-  # 
-  # if (plot == "TRUE") {
-  #   ggsave(paste0("./WASI_forward.png"), plot = g1,
-  #          scale = 1.5, width = 4.5, height = 4.5, units = "in",dpi = 300)
-  # }
   
   #--------------------------------------------------------------------------
   ## Objective function for the inverse mode
