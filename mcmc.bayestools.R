@@ -71,7 +71,7 @@ bayessetup <- createBayesianSetup(prior = NULL,
                                   lower = lower.bound, upper = upper.bound,
                                   names = c("chl","acdom440","anap440", "pop.sd"), parallel = F)
 
-checkBayesianSetup(bayessetup) #Test if the setup is inititated for theta pars
+checkBayesianSetup(bayessetup) #Test if the setup is initiated for theta pars
 
 settings = list(iterations = 10000, message = TRUE, nrChains = 1, burnin=2000) #Set MCMC config
 samplerlist <-c("Metropolis", "AM", "DR", "DRAM", "DE", "DEzs", "DREAM", "DREAMzs", "SMC")
@@ -175,7 +175,7 @@ dev.off()
 #Create MCMC plots (Random Walk in 3-D parameter space)
 #------------------------------------------------------------------------------------------------
 
-#@@@@@@@@@@@@@@@@@@-Create 3D parameter space move----------------------
+#@@@@@@@@@@@@@@@@@@-Create 3D parameter space move-#@@@@@@@@@@@@@@@@@@
 dir.create("gfx/2D")  # sub-directory to store individual plot files
 
 iterationlist <- c(seq(1,100,5),seq(101,dim(chain.mean)[1],by = 50))
@@ -214,7 +214,7 @@ for(i in iterationlist) {
   print(paste0(i,"th iteration saved"))
 }
 
-#@@@@@@@@@@@@@@@@@@-Create 3D parameter space move----------------------
+#@@@@@@@@@@@@@@@@@@-Create 3D parameter space move-#@@@@@@@@@@@@@@@@@@
 dir.create("gfx/3D")  # sub-directory to store individual plot files
 
 iterationlist <- c(seq(1,100,5),seq(101,dim(chain.mean)[1],by = 50))

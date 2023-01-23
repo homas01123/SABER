@@ -25,6 +25,17 @@ require(rho)
 require(marqLevAlg)
 require(BayesianTools)
 require(coda)
+
+read_excel_allsheets <- function(filename, tibble = FALSE) {
+  # I prefer straight data.frames
+  # but if you like tidyverse tibbles (the default with read_excel)
+  # then just pass tibble = TRUE
+  sheets <- readxl::excel_sheets(filename)
+  x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+  if(!tibble) x <- lapply(x, as.data.frame)
+  names(x) <- sheets
+  x
+}
 #--------------------------------------------------------------------------
 ## Inputs
 #Water type specs
@@ -96,16 +107,26 @@ WV= 2.500; # [cm]
 #-----------------------------------------------------------------------------------------------------
 #Perform forward modeling
 #-----------------------------------------------------------------------------------------------------
+##Read the IOCCG database
+insitu.data <- read_excel_allsheets(paste0(getwd(),"/IOP_AOP_Sun60.xls"))
+
+water.data <- insitu.data$Basics[6:46, 1:3] 
+names(water.data) <- c("wavelength", "a_w", "bb_w") 
+
+a.ph = insitu.data$a_ph; a.g = insitu.data$a_g; a.d = insitu.data$a_dm
+bb = insitu.data$bb_ch + insitu.data$bb_dm
+
 ##Single FORWARD RUN
 
 batch=TRUE #Set TRUE for IOCCG dataset duplication; Set FALSE for user wanted random inputs 
-insitu.present=TRUE #Set TRUE if actual in situ observation or simulated observation exist; else set FALSE
+insitu.present=TRUE #Set TRUE if actual in situ observation or simulated observation exist; 
+                    #else set FALSE
 plot=FALSE #Set TRUE when the ggplot2 outputs needed to be saved onto disk
 j=376 # No. of IOCCG data point among 500
 
 if (insitu.present == TRUE) {#Set Rrs observation data
   
-  insitu.data <-rrs.HL[j,] #Set the observed Rrs manually here
+  insitu.data <-rrs.HL[j,] #Set the observed Rrs manually here from IOCCG
 }
 
 if (batch == TRUE) { #For IOCCG
@@ -122,7 +143,7 @@ if (batch == TRUE) { #For IOCCG
 
 forward.op.am <- Saber_forward(chl = Fit.input$chl, acdom440 = Fit.input$acdom.440, 
                             anap440 =Fit.input$anap.440 , bbp.550 = Fit.input$bbp.550, 
-                            realdata = Rrs_obs.interp, verbose = T,z = zB,
+                            realdata = insitu.data, verbose = T,z = zB,
                             rb.fraction = fA.set)
 
 rrs.forward.am <- forward.op.am[[1]]$Rrs #Extract AM03 modelled Rrs
@@ -130,7 +151,7 @@ rrs.forward.am <- forward.op.am[[1]]$Rrs #Extract AM03 modelled Rrs
 forward.op.lee <- Lee_forward(chl = Fit.input$chl, acdom440 = Fit.input$acdom.440, 
                               anap440 =Fit.input$anap.440 , 
                               bbp.550 = Fit.input$bbp.550, 
-                              realdata = Rrs_obs.interp, verbose = T,z = zB,
+                              realdata = insitu.data, verbose = T,z = zB,
                               rb.fraction = fA.set)
 
 rrs.forward.lee <- forward.op.lee[[1]]$Rrs #Extract Lee98 modelled Rrs
@@ -260,7 +281,8 @@ rrs.forward.LUT <- matrix(nrow = length(Fit.input.LUT$C_ph), ncol = length(wavel
 for (i in 1:length(Fit.input.LUT$C_ph)) { #Create Rrs LUT
   temp1 <- as.numeric(Fit.input.LUT[i,])
   temp2 <- Saber_forward(chl = temp1[1], acdom440 = temp1[2], 
-                         anap440 =temp1[3],bbp.550 = Fit.input$bbp.550, realdata = rrs.forward.am )
+                         anap440 =temp1[3],bbp.550 = Fit.input$bbp.550, 
+                         realdata = rrs.forward.am )
   rrs.forward.LUT[i,] <- temp2[[1]]$Rrs
   cat(paste0("\033[0;42m",i," iterations over, ", (nrow(rrs.forward.LUT) - i), " remaining","\033[0m","\n"))
   
@@ -270,7 +292,14 @@ for (i in 1:length(Fit.input.LUT$C_ph)) { #Create Rrs LUT
 #Perform inverse modeling using optimization of inverse cost function
 #-----------------------------------------------------------------------------------------------------
 #Set Rrs observation data
-obsdata <-insitu.data#manual set obsdata to begin inversion
+if (insitu.present == TRUE) {
+  
+  obsdata <-insitu.data #manual set obsdata to begin inversion
+}else {
+  
+  obsdata <-rrs.forward.am #manual set obsdata to begin inversion
+}
+
 
 #Pre-FIT of initial values
 pre.Fit <- data.frame("C_ph"=seq(1,10,0.5),
@@ -309,8 +338,9 @@ prefit.best <- pre.Fit.input.LUT[which.min(reslist),] #retrieve best initial val
 rrs.prefit <- Saber_forward(chl = prefit.best$C_ph, acdom440 = prefit.best$a_cdom.440 , 
               anap440 =prefit.best$a.nap.440, bbp.550 = Fit.input$bbp.550,realdata = obsdata, verbose = T)[[1]]$Rrs
 
-#plot(wavelength, Rrs_obs.interp, type="l", col="red")
-#lines(wavelength, prefit.Rrs, col="green")
+#Show prefit spectra
+plot(wavelength, rrs.forward.am, type="l", col="red")
+lines(wavelength, rrs.prefit, col="green")
 
 #-----------------------------------------------------------------------------------------
 ##Do the optimization 
@@ -325,9 +355,11 @@ if (pop.sd == "known") {
 }
 
 #Initial values from USER
+
 # par0 = c(chl = 2, acdom440 = 0.8, 
 #          anap440 = 0.05, population.sd = 0.1) 
 
+#Autoscale Intital values from pre-Ft
 increament.scale <- 1
 lower.bound <- par0 - 0.8*par0
 upper.bound <- par0 + 5*par0
@@ -337,11 +369,11 @@ obj = c("log-LL", "SSR"); obj.run <- obj[1]
 methods.opt <- c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B", "SANN", "Brent","levenberg-marqardt")
 
 inverse_output <- solve.objective.inverse(initial = par0, obsdata = obsdata,
-                                          sa.model = "lee99", obj.fn =obj.run , 
+                                          sa.model = "am03", obj.fn =obj.run , 
                                           method.opt = methods.opt[4],
                                           lower.b = lower.bound,
                                           upper.b = upper.bound, 
-                                          batch = TRUE,pop.sd = FALSE)
+                                          batch = FALSE, pop.sd = FALSE)
 if (obj.run == "log-LL") {
   Fit.optimized.ssobj <- data.frame("chl"=inverse_output[[1]]$estimates[1], 
                                     "acdom.440"=inverse_output[[1]]$estimates[2],
@@ -354,6 +386,7 @@ if (obj.run == "log-LL") {
                                 "anap.440"=inverse_output[[1]]$anap.440)
   }
 }
+
 #------------------------------------------------------------------------------------
 #Implement MCMC optimization
 
@@ -366,7 +399,7 @@ bayessetup <- createBayesianSetup(prior = prior.actual,
                                   likelihood = ll,#lower = c(0,0,0), upper = c(30,5,0.5),
                                   names = c("chl","acdom440","anap440"), parallel = T)
 
-checkBayesianSetup(bayessetup) #Test if the setup is inititated for theta pars
+checkBayesianSetup(bayessetup) #Test if the setup is initiated for theta pars
 
 settings = list(iterations = 10000, message = TRUE, nrChains = 1, burnin=2000) #Set MCMC config
 samplerlist <-c("Metropolis", "AM", "DR", "DRAM", "DE", "DEzs", "DREAM", "DREAMzs", "SMC")
