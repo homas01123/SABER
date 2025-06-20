@@ -101,15 +101,15 @@ Rrs_fDOM <- function(use_qaa_adg = T, rrs_input_for_qaa = obsdata- obsdata_sicf,
     )
     
     if (sunzen_Ed < 0) {
-      print("Sun Zenith was not provided, calculated from Geometry")
       sunzen_Ed = Cops::GreggCarder.sunang(rad = 180/pi, iday = jday_no, 
                                            xlon = lon_Ed, ylat = lat_Ed, hr = time_dec)
+      print(paste0("Sun Zenith was not provided,", sunzen_Ed," is calculated from Geometry"))
     }
     #browser()
     
     tryCatch({
       #Calculate the Ed following Gregg & Carder 1990
-      print("Entered try catch")
+      #print("Entered try catch")
       test_Ed = GreggCarder.f.modified(the = sunzen_Ed, 
                                        lam.sel = lambda, hr = time_dec,
                                        jday = jday_no, rlon = lon_Ed, rlat = lat_Ed, debug = F)
@@ -117,8 +117,8 @@ Rrs_fDOM <- function(use_qaa_adg = T, rrs_input_for_qaa = obsdata- obsdata_sicf,
       if (all(is.na(test_Ed))) {
         cat(paste0("Sun is below horizon with given sun-earth geometry, reseting to default"))
         
-        sunzen_Ed = -999; lat_Ed = 49; lon_Ed = -68;
-        date_time_Ed = "2019-08-18 20:50 GMT"
+        sunzen_Ed = -999; lat_Ed = lat_Ed; lon_Ed = lon_Ed;
+        date_time_Ed = date_time_Ed
         
         
         library(lubridate)
@@ -191,6 +191,16 @@ Rrs_fDOM <- function(use_qaa_adg = T, rrs_input_for_qaa = obsdata- obsdata_sicf,
   
   if ((use_qaa_adg == TRUE & type_Rrs_below == "deep") & (!is.na(dg_443_val))) {
     print("fDOM: The water type is deep,but user given value of adg(443) will be used")
+    abs_CDM_440 = dg_443_val
+  }
+  
+  if ((use_qaa_adg == FALSE & type_Rrs_below == "deep") & (!is.na(dg_443_val))) {
+    print("fDOM: The water type is deep and user given value of adg(443) will be used")
+    abs_CDM_440 = dg_443_val
+  }
+  
+  if ((use_qaa_adg == FALSE & type_Rrs_below == "shallow") & (!is.na(dg_443_val))) {
+    print("fDOM: The water type is shallow and user given value of adg(443) will be used")
     abs_CDM_440 = dg_443_val
   }
   

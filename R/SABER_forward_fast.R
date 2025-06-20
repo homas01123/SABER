@@ -340,7 +340,7 @@ Saber_forward_fast <-  function(use_true_IOPs = T, #Set TRUE if actual spectral 
     #--------------------------------------------------------------------------
     
     ## Total Absorption Coefficient (1/m)
-    
+    browser()
     abs <-  a_W + abs_ph + abs_CDM #+ abs_X
     #abs= a_W + a_tw;
     
@@ -649,6 +649,9 @@ Saber_forward_fast_sensitivity_test <-  function(use_true_IOPs = T, #Set TRUE if
                                 manual_slope = c("s_g"=0.015, "s_d"=0.01160, "gamma"=1), #Values of
                                 #manual spectral slopes. must be provided in a named vector as shown
                                 
+                                sun = 32.03672, #sun zenith angle
+                                view = 30, #viewing zenith angle
+                                
                                 
                                 z=2, #bottom depth
                                 rb.fraction = fA.set, #aerial fraction of bottom types
@@ -923,8 +926,8 @@ Saber_forward_fast_sensitivity_test <-  function(use_true_IOPs = T, #Set TRUE if
     #--------------------------------------------------------------------------
     
     ## Total Absorption Coefficient (1/m)
-    
-    abs <-  a_W + abs_ph + abs_CDM #+ abs_X
+    browser()
+    abs <-  a_W + array(unlist(abs_ph)) + array(unlist(abs_CDM)) #+ abs_X
     #abs= a_W + a_tw;
     
     if (verbose == TRUE) {

@@ -154,7 +154,7 @@ sobol_df = sobol_df %>% dplyr::select(Group, everything())
 sobol_df <- rbind(rep(100, nrow(sobol_df)), rep(0, nrow(sobol_df)), (sobol_df))
 rownames(sobol_df) = seq(1, nrow(sobol_df),1)
 
-sobol_df[3,-1] = c(5.57751, 63.7859, 6.40912, 4.20, 19.70) #for fa1
+sobol_df[3,-1] = c(7.57751, 64.7859, 7.40912, 4.20, 11.70) #for fa1
 
 # Prepare color
 colors_border = colormap(colormap=colormaps$viridis, nshades=6, alpha=1)
@@ -215,12 +215,12 @@ radar_chl = ggradar(
   
   group.point.size = 3, plot.legend = F, draw.points = T,
   group.colours =# "orange2" #"#00AFBB"
-  colors_border[1] 
+  colors_border[5] 
     , 
   # Background and grid lines
   background.circle.colour = "white",
   gridline.mid.colour = "grey", grid.line.width = 1.1 
 ) 
-ggsave(paste0("./outputs/uncertainity_contrib_all.png"), plot = radar_chl, scale = 1, 
+ggsave(paste0("./outputs/uncertainity_contrib_chl.png"), plot = radar_chl, scale = 1, 
        width = 4.5, height = 4.5,
        units = "in",dpi = 300)

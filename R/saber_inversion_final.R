@@ -541,6 +541,3 @@ run_inverse_mode <- function(rrs_input,
 # run_inverse_mode(rrs_input = as.numeric(rrs.forward.SABER[1,]), 
 #                  wavelength_input = wavelength)
 # param_vec[100,]
-
-
-

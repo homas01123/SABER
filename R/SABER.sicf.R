@@ -1,4 +1,4 @@
-Rrs_Fluorescence <- function(dg_comsposite=TRUE, dg_443,
+Rrs_sicf <- function(dg_comsposite=TRUE, dg_443,
                              c_chl, abs_cdom_443, abs_nap_443,
                              
                              Ed_path = "./data/input-spectra/Ed_HL.csv",
@@ -8,6 +8,7 @@ Rrs_Fluorescence <- function(dg_comsposite=TRUE, dg_443,
                              date_time_Ed = "2019-08-18 20:50 GMT",
                              
                              coeff_x=c(0.0992,0.40,0.078), 
+                             use_sicf_rad = F,
                              wavelength=seq(400,800,10), phi_f=0.01) {
   lambda = wavelength
   
@@ -133,6 +134,18 @@ Rrs_Fluorescence <- function(dg_comsposite=TRUE, dg_443,
   # Calculate Lf based on the spectral profile and the wavelength
   Lf <- Lf_685 * Lf_distribute(wavelength)
   Rrs_sicf = Lf/(Ed_0m_sicf)
-  return(Rrs_sicf)
+  if (use_sicf_rad == FALSE) {
+    
+    sicf = data_frame("wavelength" = wavelength#[1:length(wavelength)-1]
+                      , "sicf" = Rrs_sicf)
+    
+  } else {
+    sicf = data_frame("wavelength" = wavelength#[1:length(wavelength)-1]
+                      , "sicf" = Lf)
+  }
+  
+  print(paste0("Subsurface (0^-) Rrs equivalent to SICF is calculated"))
+  
+  return(sicf)
   
 }
